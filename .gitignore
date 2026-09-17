@@ -1,0 +1,25 @@
+# --- Secrets / config locale -------------------------------------------------
+# Contient l'identifiant de compte Snowflake et l'utilisateur SSO.
+# Repartir de .snowflake.env.example (voir README).
+.snowflake.env
+
+# --- Sorties générées --------------------------------------------------------
+# Le dashboard est entièrement reconstruit par tools/build_dashboard.py à partir
+# des JSON extraits de Snowflake (~280 Mo, dont inbox.js à 74 Mo : au-delà de la
+# limite de confort GitHub et sans intérêt en versionné puisque régénérable).
+dashboard/*.json
+dashboard/*.js
+dashboard/index.html
+
+# Exports d'exploration produits par tools/explore.py et tools/profile1.py.
+data/*.csv
+
+# --- Divers ------------------------------------------------------------------
+.DS_Store
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Réglages Claude Code propres au poste (chemins absolus, permissions locales).
+.claude/

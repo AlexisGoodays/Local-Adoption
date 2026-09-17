@@ -1,0 +1,3 @@
+# Seule dépendance réelle : le connecteur Snowflake (il embarque tout le reste).
+# L'authentification se fait via SSO navigateur, aucune clé à installer.
+snowflake-connector-python>=3.0
