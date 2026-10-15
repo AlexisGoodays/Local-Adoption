@@ -35,6 +35,32 @@ SELECT 'T00 garde  un mart cle est vide' AS chk,
       + IFF((SELECT COUNT(*) FROM REPORTING.ADOPTION.MART_CONNECTED_PERIOD_UNIT) = 0, 1, 0)) AS n,
        'comptes portefeuille : ' || (SELECT COUNT(*) FROM REPORTING.ADOPTION.MART_PORTFOLIO_30D) AS exemple
 
+-- ---------- FRAICHEUR DE LA COPIE DE NUIT ----------
+-- La base analytics est une copie du monolith, rafraichie chaque matin entre
+-- 8h et 8h30. La journee en cours s'arrete donc vers 2h du matin et ne contient
+-- quasiment rien : le dernier jour COMPLET est la veille.
+-- Sans ces deux controles, une copie en echec passerait inapercue et le
+-- dashboard afficherait des donnees figees sans que rien ne le signale.
+UNION ALL SELECT 'T01 fraicheur  copie en retard, la veille est incomplete' AS chk,
+       IFF((SELECT MAX(ACTIVITY_DATE) FROM REPORTING.ADOPTION.FCT_LOCAL_ADOPTION_DAILY)
+           < DATEADD('day', -1, CURRENT_DATE), 1, 0) AS n,
+       'dernier jour present : ' || (SELECT TO_VARCHAR(MAX(ACTIVITY_DATE))
+           FROM REPORTING.ADOPTION.FCT_LOCAL_ADOPTION_DAILY) AS exemple
+-- Comparaison au meme jour de la semaine precedente, pour ne pas confondre une
+-- copie partielle avec le creux normal du week-end.
+UNION ALL SELECT 'T02 fraicheur  veille anormalement creuse',
+       IFF(veille < 0.5 * NULLIF(semaine_avant, 0), 1, 0),
+       'veille ' || veille || ' connectes contre ' || semaine_avant || ' le meme jour la semaine precedente'
+FROM (
+    SELECT
+      COUNT(DISTINCT IFF(ACTIVITY_DATE = DATEADD('day', -1, CURRENT_DATE)
+                         AND IS_CONNECTED, USERNAME || '|' || CUSTOMER_ID, NULL)) AS veille,
+      COUNT(DISTINCT IFF(ACTIVITY_DATE = DATEADD('day', -8, CURRENT_DATE)
+                         AND IS_CONNECTED, USERNAME || '|' || CUSTOMER_ID, NULL)) AS semaine_avant
+    FROM REPORTING.ADOPTION.FCT_LOCAL_ADOPTION_DAILY
+    WHERE ACTIVITY_DATE IN (DATEADD('day', -1, CURRENT_DATE), DATEADD('day', -8, CURRENT_DATE))
+)
+
 -- ---------- ECRAN PORTEFEUILLE ----------
 UNION ALL SELECT 'P01 portefeuille  connectes superieurs aux crees' AS chk, COUNT(*) AS n,
        MAX(customer_name || ' (' || connected_users || ' / ' || created_users || ')') AS exemple
