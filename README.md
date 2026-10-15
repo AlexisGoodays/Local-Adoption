@@ -95,24 +95,31 @@ Inbox a pu afficher 107 % en cours de projet. **Rejouez toujours la séquence
 entière, le même jour.**
 
 ```bash
-# 1. Couche SQL — dans cet ordre exact
-python3 tools/build.py sql/build_adoption.sql          # dimensions + fait de base (400 j)
-python3 tools/build.py sql/build_insight.sql
-python3 tools/build.py sql/build_erep.sql
-python3 tools/build.py sql/build_inbox.sql
-python3 tools/build.py sql/build_hierarchy.sql         # rattachement hiérarchique + marts par unité
-python3 tools/build.py sql/build_erep_acquisition.sql
-python3 tools/build.py sql/build_portfolio.sql         # EN DERNIER : relit les marts des modules
-
-# 2. Extraction Snowflake -> JSON
-python3 tools/extract_insight.py
-python3 tools/extract_erep.py
-python3 tools/extract_inbox.py
-python3 tools/extract_portfolio.py
-
-# 3. Génération du dashboard
-python3 tools/build_dashboard.py
+python3 tools/refresh_all.py
 ```
+
+Ce script enchaîne les douze étapes dans le bon ordre et s'arrête à la première
+erreur. En cas d'échec, il indique la commande pour reprendre là où ça s'est
+arrêté (`--from N`). `--dry-run` affiche la séquence sans rien exécuter.
+
+**N'enchaînez pas les scripts à la main.** L'oubli d'une étape ne produit aucune
+erreur visible : le dashboard se régénère, mais mélange des fenêtres de dates
+différentes. Oublier `build_hierarchy` par exemple laisse les données par unité
+dans l'état du refresh précédent pendant que les données utilisateur avancent.
+
+Pour mémoire, l'ordre appliqué par le script :
+
+| # | Étape | Remarque |
+|---|---|---|
+| 1 | `build_adoption.sql` | dimensions, fait de base sur 400 j, connectés par période |
+| 2 | `build_insight.sql` | |
+| 3 | `build_erep.sql` | |
+| 4 | `build_inbox.sql` | |
+| 5 | `build_hierarchy.sql` | rattachement, marts par unité, adoption par établissement |
+| 6 | `build_erep_acquisition.sql` | value driver Acquisition |
+| 7 | `build_portfolio.sql` | **en dernier**, relit les marts des modules |
+| 8 à 11 | les quatre extractions | Insight, E-rép, Inbox, Portefeuille |
+| 12 | `build_dashboard.py` | génère `index.html` et les bundles |
 
 Comptez quelques minutes au total. Une fenêtre SSO peut s'ouvrir à chaque script.
 
@@ -187,10 +194,31 @@ c'est signalé sur le bloc.
 
 ### Vérifier la cohérence
 
-Le projet tient un jeu de contrôles d'invariants (actifs ≤ connectés ≤ créés à
-tous les niveaux, ratios stockés cohérents avec leurs composants, « connectés »
-identique entre les marts, concordance Portefeuille ↔ onglets). Après un
-changement de définition, rejouez-les : tout doit rester à zéro violation.
+```bash
+python3 tools/sf.py -f sql/check_invariants.sql --max-rows 60
+```
+
+35 contrôles, qui doivent tous afficher `OK`. Les violations éventuelles
+remontent en tête de liste, avec un exemple nommé pour savoir où regarder.
+
+Ils couvrent quatre familles de risques :
+
+- **Le funnel** : actifs ≤ connectés ≤ créés, au niveau compte comme au niveau
+  unité, pour les trois modules
+- **Les ratios stockés**, qui doivent correspondre à leur numérateur et à leur
+  dénominateur
+- **La cohérence entre écrans** : un même libellé doit afficher le même nombre
+  au Portefeuille et dans l'onglet du module
+- **L'adoption par établissement**, dont la somme des unités ne doit jamais
+  dépasser le total du compte
+
+Un contrôle de garde vérifie d'abord que les marts ne sont pas vides, sans quoi
+tous les autres passeraient au vert sur une base non construite.
+
+**À rejouer après tout changement de définition et après chaque rafraîchissement
+complet.** Une seule ligne en `A VERIFIER` suffit à considérer que le dashboard
+ne doit pas être diffusé en l'état. Les trois incohérences majeures corrigées en
+septembre 2026 auraient toutes été attrapées ici.
 
 ---
 

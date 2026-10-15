@@ -217,7 +217,7 @@ ol.rank .n{color:var(--muted);font-variant-numeric:tabular-nums}
     <div class="note" id="i_disclaimer"></div>
 
     <h2 class="section-h">Adoption</h2>
-    <div class="kpis" id="i_kpis" style="grid-template-columns:repeat(2,minmax(200px,260px))"></div>
+    <div class="kpis" id="i_kpis" style="grid-template-columns:repeat(3,minmax(190px,250px))"></div>
 
     <div class="panel">
       <h2 id="i_chart_h">Utilisateurs actifs Insight — quotidien</h2>
@@ -326,7 +326,7 @@ ol.rank .n{color:var(--muted);font-variant-numeric:tabular-nums}
     <div class="note" id="e_disclaimer"></div>
 
     <h2 class="section-h">Adoption</h2>
-    <div class="kpis" id="e_kpis" style="grid-template-columns:repeat(2,minmax(200px,260px))"></div>
+    <div class="kpis" id="e_kpis" style="grid-template-columns:repeat(3,minmax(190px,250px))"></div>
 
     <div class="panel">
       <h2 id="e_chart_h">Utilisateurs actifs Insight — quotidien</h2>
@@ -437,7 +437,7 @@ ol.rank .n{color:var(--muted);font-variant-numeric:tabular-nums}
     <div class="note" id="x_disclaimer"></div>
 
     <h2 class="section-h">Adoption <span class="chip">fenêtre fixe 30 jours</span></h2>
-    <div class="kpis" id="x_kpis" style="grid-template-columns:repeat(3,minmax(200px,260px))"></div>
+    <div class="kpis" id="x_kpis" style="grid-template-columns:repeat(4,minmax(175px,240px))"></div>
 
     <div class="panel">
       <h2 id="x_chart_h">Connectés &amp; actifs Inbox — quotidien</h2>
@@ -663,6 +663,13 @@ document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
   const PERIMETERS = INSIGHT.perimeters || [];
   // dénominateurs "connectés" par période — index : 0=30j, 1=mois préc., 2=trimestre, 3=année
   const CONN_PERIOD = INSIGHT.connected_period || {};
+  // adoption a la maille etablissement : [places_local, 30j, mois prec., trimestre, annee]
+  const PLACE_ADOPT = INSIGHT.place_adoption || {};
+  const PLACE_ADOPT_UNIT = (() => {
+    const m = new Map();
+    for(const r of (INSIGHT.place_adoption_unit || [])) m.set(r[0] + '|' + r[1], [r[2], r[3], r[4], r[5], r[6]]);
+    return m;
+  })();
   const CONN_PERIOD_UNIT = (() => {
     const m = new Map();
     for(const r of (INSIGHT.connected_period_unit || [])) m.set(r[0] + '|' + r[1], [r[2], r[3], r[4], r[5]]);
@@ -802,6 +809,24 @@ document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
     }
     return s;
   }
+  // Etablissements actifs : un etablissement compte des qu'un de SES utilisateurs
+  // locaux a ete actif. Un etablissement appartient a une seule unite par niveau,
+  // donc la somme sur un perimetre multi-unites est exacte, sans double comptage.
+  function placesActives(cid, perimSel){
+    const pi = connIdx();
+    const src = [];
+    if(perimSel && perimSel.length){
+      for(const t of perimSel){ const a = PLACE_ADOPT_UNIT.get(cid + '|' + t); if(a) src.push(a); }
+    } else if(cid){
+      const a = PLACE_ADOPT[cid]; if(a) src.push(a);
+    } else {
+      for(const c of custs){ const a = PLACE_ADOPT[c.customer_id]; if(a) src.push(a); }
+    }
+    if(!src.length) return null;
+    let tot = 0, act = 0;
+    for(const a of src){ tot += a[0] || 0; if(pi !== undefined) act += a[pi + 1] || 0; }
+    return {total: tot, actives: pi === undefined ? null : act};
+  }
   function ctxLabel(cid){
     const cs = cid ? custs.filter(c=>c.customer_id===cid) : custs;
     return cid ? (cs[0] ? cs[0].customer_name : '—') : `${cs.length} comptes`;
@@ -894,9 +919,13 @@ document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>{
       + `${connected==null ? '—' : nf.format(connected)} connectés${jSuffix} · période : ${IS_DEFAULT ? '30 j' : PERIOD[0]+' → '+PERIOD[1]}`
       + (unitScope ? ` · périmètre : ${unitScope.label}` + (perimSel.length>1 ? ' (connectés = somme des unités)' : '') : '');
 
+    const pl = placesActives(cid, perimSel);
     const kpis = [
       ['Connectés', connected, null, connected==null ? 'non calculable sur période personnalisée' : `tous modules${jSuffix}`],
       ['Actifs Insight', active, connected ? active/connected : null, connected==null ? 'sur la période' : `des connectés${jSuffix}`],
+      ['Établissements actifs', pl ? pl.actives : null,
+        (pl && pl.actives!=null && pl.total) ? pl.actives/pl.total : null,
+        pl ? `sur ${nf.format(pl.total)} ayant un utilisateur local` : 'donnée indisponible'],
     ];
     document.getElementById('i_kpis').innerHTML = kpis.map(([l,v,r,d])=>`
       <div class="kpi"><div class="lab">${l}</div><div class="val">${v==null ? '—' : nf.format(v)}</div>
@@ -1237,6 +1266,13 @@ function initErep(){
   const PERIMETERS = EREP.perimeters || [];
   // dénominateurs "connectés" par période — index : 0=30j, 1=mois préc., 2=trimestre, 3=année
   const CONN_PERIOD = EREP.connected_period || {};
+  // adoption a la maille etablissement : [places_local, 30j, mois prec., trimestre, annee]
+  const PLACE_ADOPT = EREP.place_adoption || {};
+  const PLACE_ADOPT_UNIT = (() => {
+    const m = new Map();
+    for(const r of (EREP.place_adoption_unit || [])) m.set(r[0] + '|' + r[1], [r[2], r[3], r[4], r[5], r[6]]);
+    return m;
+  })();
   const CONN_PERIOD_UNIT = (() => {
     const m = new Map();
     for(const r of (EREP.connected_period_unit || [])) m.set(r[0] + '|' + r[1], [r[2], r[3], r[4], r[5]]);
@@ -1374,6 +1410,24 @@ function initErep(){
       if(a) s += a[pi] || 0;
     }
     return s;
+  }
+  // Etablissements actifs : un etablissement compte des qu'un de SES utilisateurs
+  // locaux a ete actif. Un etablissement appartient a une seule unite par niveau,
+  // donc la somme sur un perimetre multi-unites est exacte, sans double comptage.
+  function placesActives(cid, perimSel){
+    const pi = connIdx();
+    const src = [];
+    if(perimSel && perimSel.length){
+      for(const t of perimSel){ const a = PLACE_ADOPT_UNIT.get(cid + '|' + t); if(a) src.push(a); }
+    } else if(cid){
+      const a = PLACE_ADOPT[cid]; if(a) src.push(a);
+    } else {
+      for(const c of custs){ const a = PLACE_ADOPT[c.customer_id]; if(a) src.push(a); }
+    }
+    if(!src.length) return null;
+    let tot = 0, act = 0;
+    for(const a of src){ tot += a[0] || 0; if(pi !== undefined) act += a[pi + 1] || 0; }
+    return {total: tot, actives: pi === undefined ? null : act};
   }
   function ctxLabel(cid){
     const cs = cid ? custs.filter(c=>c.customer_id===cid) : custs;
@@ -1573,9 +1627,13 @@ function initErep(){
       + `${connected==null ? '—' : nf.format(connected)} connectés${jSuffix} · période : ${IS_DEFAULT ? '30 j' : PERIOD[0]+' → '+PERIOD[1]}`
       + (unitScope ? ` · périmètre : ${unitScope.label}` + (perimSel.length>1 ? ' (connectés = somme des unités)' : '') : '');
 
+    const pl = placesActives(cid, perimSel);
     const kpis = [
       ['Connectés', connected, null, connected==null ? 'non calculable sur période personnalisée' : `tous modules${jSuffix}`],
       ['Actifs E-rép', active, connected ? active/connected : null, connected==null ? 'sur la période' : `des connectés${jSuffix}`],
+      ['Établissements actifs', pl ? pl.actives : null,
+        (pl && pl.actives!=null && pl.total) ? pl.actives/pl.total : null,
+        pl ? `sur ${nf.format(pl.total)} ayant un utilisateur local` : 'donnée indisponible'],
     ];
     document.getElementById('e_kpis').innerHTML = kpis.map(([l,v,r,d])=>`
       <div class="kpi"><div class="lab">${l}</div><div class="val">${v==null ? '—' : nf.format(v)}</div>
@@ -1850,6 +1908,13 @@ function initInbox(){
   const PERIMETERS = INBOX.perimeters || [];
   // dénominateurs "connectés" par période — index : 0=30j, 1=mois préc., 2=trimestre, 3=année
   const CONN_PERIOD = INBOX.connected_period || {};
+  // adoption a la maille etablissement : [places_local, 30j, mois prec., trimestre, annee]
+  const PLACE_ADOPT = INBOX.place_adoption || {};
+  const PLACE_ADOPT_UNIT = (() => {
+    const m = new Map();
+    for(const r of (INBOX.place_adoption_unit || [])) m.set(r[0] + '|' + r[1], [r[2], r[3], r[4], r[5], r[6]]);
+    return m;
+  })();
   const CONN_PERIOD_UNIT = (() => {
     const m = new Map();
     for(const r of (INBOX.connected_period_unit || [])) m.set(r[0] + '|' + r[1], [r[2], r[3], r[4], r[5]]);
@@ -1965,6 +2030,24 @@ function initInbox(){
       if(a) s += a[pi] || 0;
     }
     return s;
+  }
+  // Etablissements actifs : un etablissement compte des qu'un de SES utilisateurs
+  // locaux a ete actif. Un etablissement appartient a une seule unite par niveau,
+  // donc la somme sur un perimetre multi-unites est exacte, sans double comptage.
+  function placesActives(cid, perimSel){
+    const pi = connIdx();
+    const src = [];
+    if(perimSel && perimSel.length){
+      for(const t of perimSel){ const a = PLACE_ADOPT_UNIT.get(cid + '|' + t); if(a) src.push(a); }
+    } else if(cid){
+      const a = PLACE_ADOPT[cid]; if(a) src.push(a);
+    } else {
+      for(const c of custs){ const a = PLACE_ADOPT[c.customer_id]; if(a) src.push(a); }
+    }
+    if(!src.length) return null;
+    let tot = 0, act = 0;
+    for(const a of src){ tot += a[0] || 0; if(pi !== undefined) act += a[pi + 1] || 0; }
+    return {total: tot, actives: pi === undefined ? null : act};
   }
   function ctxLabel(cid){
     const cs = cid ? custs.filter(c=>c.customer_id===cid) : custs;
@@ -2136,6 +2219,7 @@ function initInbox(){
     const connectedInbox = USER_ROWS.filter(u=>u.is_connected_inbox).length;
     const activeInbox = USER_ROWS.filter(u=>u.is_active_inbox).length;
     const totalReplies = USER_ROWS.reduce((s,u)=>s+(u.n_replies||0),0);
+    const plx = placesActives(cid, perimSel);
     const connected = scopeP ? (scopeP.connected_users || 0) : connFor(cid);
 
     document.getElementById('x_ctx').textContent =
@@ -2147,6 +2231,9 @@ function initInbox(){
       ['Connecté Inbox', connectedInbox, connected ? pct(connectedInbox/connected) : null, 'des connectés (30 j)'],
       ['Actif Inbox', activeInbox, connectedInbox ? pct(activeInbox/connectedInbox) : null, 'des connectés Inbox'],
       ['Réponses', totalReplies, activeInbox ? (totalReplies/activeInbox).toFixed(1) : null, 'réponse(s)/actif Inbox'],
+      ['Établissements actifs', plx ? plx.actives : null,
+        (plx && plx.actives!=null && plx.total) ? pct(plx.actives/plx.total) : null,
+        plx ? `sur ${nf.format(plx.total)} ayant un utilisateur local` : 'donnée indisponible'],
     ];
     document.getElementById('x_kpis').innerHTML = kpis.map(([l,v,r,d])=>`
       <div class="kpi"><div class="lab">${l}</div><div class="val">${nf.format(v)}</div>

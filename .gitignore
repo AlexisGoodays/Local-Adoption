@@ -23,3 +23,14 @@ venv/
 
 # Réglages Claude Code propres au poste (chemins absolus, permissions locales).
 .claude/
+
+# Archive de diffusion du dashboard (regenerable)
+*.zip
+diffusion/
+
+# Autres analyses clients, sans rapport avec le dashboard d'adoption.
+# Elles vivent dans ce dossier par commodité mais ne doivent pas entrer
+# dans ce dépôt : elles contiennent des données client nominatives.
+leclerc/
+bnp/
+analyse_libre/

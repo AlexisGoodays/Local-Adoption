@@ -121,6 +121,19 @@ def main():
         umap.setdefault(f"{r['username']}|{r['customer_id']}", []).append(r["level"] + SEP + r["unit_name"])
     out["user_units"] = umap
     out["perimeters"] = q(cur, f"SELECT * FROM {DB}.MART_EREP_PERIMETER_30D")
+    # adoption a la maille etablissement (2026-09-23) : etablissements dont un
+    # utilisateur LOCAL a ete actif, sur les etablissements ayant un tel utilisateur.
+    # Index periode identique aux connectes : 0=30j, 1=mois prec., 2=trimestre, 3=annee.
+    out["place_adoption"] = {
+        str(r["customer_id"]): [r["places_local"], r["erep_30d"], r["erep_prevmonth"],
+                                r["erep_quarter"], r["erep_year"]]
+        for r in q(cur, f"SELECT * FROM {DB}.MART_PLACE_ADOPTION_CUSTOMER")
+    }
+    out["place_adoption_unit"] = [
+        [r["customer_id"], r["level"] + SEP + r["unit_name"], r["places_local"],
+         r["erep_30d"], r["erep_prevmonth"], r["erep_quarter"], r["erep_year"]]
+        for r in q(cur, f"SELECT * FROM {DB}.MART_PLACE_ADOPTION_UNIT")
+    ]
     # dénominateurs "connectés" recalculés par période (2026-09-17) : permettent
     # d'afficher un ratio juste quand la période choisie n'est pas 30 j.
     out["connected_period"] = {
