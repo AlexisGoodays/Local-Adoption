@@ -6,7 +6,10 @@ WITH perimeter AS (
     FROM MARTING_BUSINESS.ANALYTICS.PRO_USERS pu
     WHERE pu.ACCOUNT_STATUS = 'active'
       AND pu.HAS_VALID_BO_ACCOUNT = TRUE
-      AND COALESCE(pu.USER_INSIGHT_REPORT_CONFIGURATION, '') <> 'specifically enabled'
+    -- Filtre USER_INSIGHT_REPORT_CONFIGURATION retire le 2026-10-15, en meme temps
+    -- que dans build_adoption.sql. Ce script recalcule le perimetre depuis les
+    -- sources brutes : il doit donc suivre la meme definition, sinon il signale
+    -- des ecarts qui n'existent pas.
     QUALIFY ROW_NUMBER() OVER (
         PARTITION BY pu.USERNAME, pu.CUSTOMER_ID
         ORDER BY pu.JOINED_AT DESC NULLS LAST, pu.USER_ID DESC

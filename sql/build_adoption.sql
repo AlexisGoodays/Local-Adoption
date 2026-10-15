@@ -45,7 +45,21 @@ WITH base AS (
     FROM MARTING_BUSINESS.ANALYTICS.PRO_USERS pu
     WHERE pu.ACCOUNT_STATUS = 'active'
       AND pu.HAS_VALID_BO_ACCOUNT = TRUE
-      AND COALESCE(pu.USER_INSIGHT_REPORT_CONFIGURATION, '') <> 'specifically enabled'
+    -- Le filtre sur USER_INSIGHT_REPORT_CONFIGURATION a ete retire le 2026-10-15.
+    -- Il excluait les 235 utilisateurs en "specifically enabled", au motif qu'il
+    -- s'agit de profils siege. Trois raisons de l'abandonner.
+    -- D'abord il etait mal place : un attribut de configuration Insight decidait
+    -- de la population des TROIS modules. Ensuite il ratait sa propre cible, en
+    -- laissant passer les 20 utilisateurs "enabled on customer", qui administrent
+    -- 1 962 etablissements en moyenne contre 221 en mediane pour les exclus.
+    -- Enfin il masquait du module Insight les utilisateurs a qui l'acces Insight
+    -- avait justement ete ouvert : +6,0 % d'actifs Insight a sa suppression,
+    -- contre +1,8 % sur l'E-reputation et +0,4 % sur les connectes.
+    -- Les taux d'adoption bougent a peine, numerateur et denominateur croissant
+    -- ensemble. Ce qui change est la visibilite de 154 utilisateurs reels.
+    -- Les garde-fous qui comptent sont ailleurs et independants de ce filtre :
+    -- le plafond de 60 etablissements pour les classements par unite, et la regle
+    -- de l'utilisateur local pour l'adoption a la maille etablissement.
 ),
 pa AS (
     SELECT pa.USERNAME, pa.CUSTOMER_ID,
